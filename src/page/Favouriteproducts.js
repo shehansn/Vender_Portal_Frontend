@@ -68,7 +68,7 @@ const Favouriteproducts = () => {
 
   return (
     <div className="p-10 m-5 ml-10 mr-10 -mt-2 md:p-4">
-      <h1 className="text-2xl md:text-4xl font-bold py-3">
+      <h1 className="text-2xl md:text-4xl font-bold py-3 tracking-widest">
         Products
       </h1>
       <div className="md:flex gap-4 py-2">
