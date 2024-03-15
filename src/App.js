@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { Outlet } from "react-router-dom";
 import "./App.css";
 import Header from "./component/Header";
-import { setDataProduct } from "./redux/productSlide";
+import { setDataFavProduct, setDataProduct } from "./redux/productSlide";
 
 function App() {
   const SERVER_URL=process.env.SERVER_DOMAIN || "http://localhost:8080";
@@ -19,8 +19,17 @@ function App() {
       const resData = await res.json()
       dispatch(setDataProduct(resData))
     })()
+
   },[])
 
+  useEffect(()=>{
+    (async()=>{
+      const res = await fetch(`${SERVER_URL}/favProducts`)
+
+      const resData = await res.json()
+      dispatch(setDataFavProduct(resData))
+    })()
+  },[])
   return (
     <>
       <Toaster />

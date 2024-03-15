@@ -3,9 +3,9 @@ import { useDispatch, useSelector } from "react-redux";
 
 import { toast } from 'react-hot-toast';
 import { Link } from "react-router-dom";
-import { DeleteIconSVG, EditIconSVG, StarSVG, StarredSVG } from "../assets/index";
+import { DeleteIconSVG, EditIconSVG, StarredSVG, StarSVG } from "../assets/index";
 import DeletePopup from '../component/DeletePopup';
-import { setDataProduct } from "../redux/productSlide";
+import { setDataFavProduct, setDataProduct } from "../redux/productSlide";
 
 const Home = () => {
   const SERVER_URL = process.env.SERVER_DOMAIN || "http://localhost:8080";
@@ -16,8 +16,7 @@ const Home = () => {
     productName: "",
     quantity: "",
     productDescription: "",
-    image: "",
-    isFav: ""
+    images: [],
   });
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [prodId, setProdId] = useState({});
@@ -26,15 +25,29 @@ const Home = () => {
 
   useEffect(() => {
     (async () => {
+      const res = await fetch(`${SERVER_URL}/favProducts`)
+
+      const resData = await res.json()
+      dispatch(setDataFavProduct(resData))
+    })()
+
+  }, [])
+
+  useEffect(() => {
+    (async () => {
       const res = await fetch(`${SERVER_URL}/product`)
 
       const resData = await res.json()
       dispatch(setDataProduct(resData))
     })()
+
   }, [])
 
 
   const productData = useSelector((state) => state.product.productList);
+  const favproductData = useSelector((state) => state.product.favProductList);
+
+  console.log("fav products" + JSON.stringify(favproductData))
 
   const handleClick = async (productId, event) => {
     event.preventDefault();
@@ -42,31 +55,48 @@ const Home = () => {
   };
 
   const addToFav = async (productId) => {
-    const foundProduct = productData.find(product => product._id === productId);
-    if (foundProduct) {
-      setData(foundProduct);
-      const updatedIsFav = !foundProduct.isFav;
-      setIsFav(updatedIsFav);
-      console.log(updatedIsFav);
+    const fetchData = await fetch(`${SERVER_URL}/addToFav/${productId}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ prodId: productId })
+    });
 
-      const fetchData = await fetch(`${SERVER_URL}/addToFav/${productId}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ isFav: updatedIsFav })
-      });
+    const fetchRes = await fetchData.json();
+    toast(fetchRes.message);
 
-      const fetchRes = await fetchData.json();
-      toast(fetchRes.message);
+    const res = await fetch(`${SERVER_URL}/favProducts`)
 
-      const res = await fetch(`${SERVER_URL}/product`)
+    const resData = await res.json()
+    dispatch(setDataFavProduct(resData))
 
-      const resData = await res.json()
-      dispatch(setDataProduct(resData))
+    saveToLocalStorage(productId);
+  };
 
+  const saveToLocalStorage = (productId) => {
+    console.log('adding to localstorage...' + productId);
+    const existingIds = localStorage.getItem('favProductIds');
+    if (existingIds) {
+      const ids = JSON.parse(existingIds);
+      if (!ids.includes(productId)) {
+        ids.push(productId);
+        localStorage.setItem('favProductIds', JSON.stringify(ids));
+      }else{
+        removeIdFromLocalStorage(productId);
+      }
     } else {
-      toast("Product not found");
+      localStorage.setItem('favProductIds', JSON.stringify([productId]));
+    }
+  };
+
+  const removeIdFromLocalStorage = (productId) => {
+    console.log('removing from localstorage...' + productId);
+    const existingIds = localStorage.getItem('favProductIds');
+    if (existingIds) {
+      const ids = JSON.parse(existingIds);
+      const updatedIds = ids.filter((itemId) => itemId !== productId);
+      localStorage.setItem('favProductIds', JSON.stringify(updatedIds));
     }
   };
 
@@ -99,7 +129,7 @@ const Home = () => {
 
   return (
     <div className="p-10 m-5 ml-10 mr-10 -mt-2 md:p-4">
-      <h1 className="text-2xl md:text-4xl font-bold py-3">
+      <h1 className="text-2xl md:text-4xl font-bold py-3 tracking-widest">
         Products
       </h1>
       <div className="md:flex gap-4 py-2">
@@ -183,7 +213,8 @@ const Home = () => {
                     <td class="px-6 py-4  whitespace-nowrap">{item.sku}</td>
                     <td class="px-6 py-4">
                       {" "}
-                      <img src={item.image} className="h-10" />
+                      {/* {`${SERVER_URL}/${item.images[0].substring(7).replace(/\\/g, '/')}`} */}
+                      {item.images.length > 0 && <img src={`${SERVER_URL}/${item.images[0].substring(7).replace(/\\/g, '/')}`} alt={"Product image"} className="h-16" />}
                     </td>
                     <td class="px-6 py-4 font-medium text-gray-900">
                       {item.productName}
@@ -212,7 +243,7 @@ const Home = () => {
                       </Link>
                       <div onClick={(event) => handleClick(item._id, event)}>
                         <Link to={"/"} >
-                          {item.isFav ? (
+                          {favproductData.some(favItem => favItem.id === item._id) ? (
                             <img className="w-6 h-6 object-contain" src={StarredSVG} />
                           ) : (
                             <img
