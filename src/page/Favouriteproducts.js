@@ -1,17 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
-import { setDataProduct } from "../redux/productSlide";
+import { setDataFavProduct } from "../redux/productSlide";
 
 import { useSelector } from "react-redux";
 
 import { toast } from 'react-hot-toast';
 import { Link } from "react-router-dom";
-import { DeleteIconSVG, EditIconSVG, StarSVG, StarredSVG } from "../assets/index";
+import { DeleteIconSVG, EditIconSVG, StarredSVG, StarSVG } from "../assets/index";
+import DeletePopup from "../component/DeletePopup";
+import { setDataProduct } from "../redux/productSlide";
+
 
 const Favouriteproducts = () => {
   const SERVER_URL = process.env.SERVER_DOMAIN || "http://localhost:8080";
-
-  const dispatch = useDispatch()
   const [isFav, setIsFav] = useState(false);
   const [data, setData] = useState({
     _id: "",
@@ -19,10 +20,28 @@ const Favouriteproducts = () => {
     productName: "",
     quantity: "",
     productDescription: "",
-    image: "",
-    isFav: ""
+    images: [],
   });
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [prodId, setProdId] = useState({});
+  const [favProdIds, setfavProdIds] = useState([]);
+  const [favProdData, setfavProdData] = useState([]);
 
+  const dispatch = useDispatch()
+
+  const productData = useSelector((state) => state.product.productList);
+  const favproductData = useSelector((state) => state.product.favProductList);
+
+
+  useEffect(() => {
+    (async () => {
+      const res = await fetch(`${SERVER_URL}/favProducts`)
+
+      const resData = await res.json()
+      dispatch(setDataFavProduct(resData))
+    })()
+
+  }, [])
 
   useEffect(() => {
     (async () => {
@@ -31,45 +50,76 @@ const Favouriteproducts = () => {
       const resData = await res.json()
       dispatch(setDataProduct(resData))
     })()
+
   }, [])
 
-  const productData = useSelector((state) => state.product.productList);
-  
-  const favProducts = productData.filter(product => product.isFav === true);
+  const favProductIds = useSelector((state) => state.product.favProductList.map(product => product.id));
+
+  useEffect(() => {
+    console.log(favProductIds);
+    setfavProdIds(favProductIds);
+    favProductIds.forEach(element => {
+      const matchingProduct = productData.filter(item => favProductIds.includes(item._id));
+      setfavProdData(matchingProduct)
+    });
+  }, [])
+
+  console.log("fav products" + JSON.stringify(favproductData))
 
   const handleClick = async (productId, event) => {
     event.preventDefault();
     await addToFav(productId);
   };
 
-
   const addToFav = async (productId) => {
-    const foundProduct = productData.find(product => product._id === productId);
-    if (foundProduct) {
-      setData(foundProduct);
-      const updatedIsFav = !foundProduct.isFav;
-      setIsFav(updatedIsFav);
-      console.log(updatedIsFav);
+    const fetchData = await fetch(`${SERVER_URL}/addToFav/${productId}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ prodId: productId })
+    });
 
-      const fetchData = await fetch(`${SERVER_URL}/addToFav/${productId}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ isFav: updatedIsFav })
-      });
+    const fetchRes = await fetchData.json();
+    toast(fetchRes.message);
 
-      const fetchRes = await fetchData.json();
-      toast(fetchRes.message);
-    } else {
-      toast("Product not found");
-    }
+    const res = await fetch(`${SERVER_URL}/favProducts`)
+
+    const resData = await res.json()
+    dispatch(setDataFavProduct(resData))
+
   };
 
+  const handleDelete = async () => {
+    console.log('Deleting...');
+    await deleteProduct();
+
+    setIsDeleteModalOpen(false);
+
+    const res = await fetch(`${SERVER_URL}/product`)
+
+    const resData = await res.json()
+    dispatch(setDataProduct(resData))
+  };
+
+  const deleteProduct = async () => {
+    console.log('Deleting...: ' + prodId);
+    const fetchData = await fetch(`${SERVER_URL}/deleteProd`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ prodId: prodId })
+    });
+
+    const fetchRes = await fetchData.json();
+    toast(fetchRes.message);
+
+  }
   return (
     <div className="p-10 m-5 ml-10 mr-10 -mt-2 md:p-4">
       <h1 className="text-2xl md:text-4xl font-bold py-3 tracking-widest">
-        Products
+        Favourite Products
       </h1>
       <div className="md:flex gap-4 py-2">
         <div className="md:w-2/3">
@@ -147,12 +197,13 @@ const Favouriteproducts = () => {
                 </tr>
               </thead>
               <tbody>
-                {favProducts.map((item) => (
+                {favProdData.map((item) => (
                   <tr key={item._id} class="bg-white border-b ">
                     <td class="px-6 py-4  whitespace-nowrap">{item.sku}</td>
                     <td class="px-6 py-4">
                       {" "}
-                      <img src={item.image} className="h-10" />
+                      {/* {`${SERVER_URL}/${item.images[0].substring(7).replace(/\\/g, '/')}`} */}
+                      {item.images.length > 0 && <img src={`${SERVER_URL}/${item.images[0].substring(7).replace(/\\/g, '/')}`} alt={"Product image"} className="h-16" />}
                     </td>
                     <td class="px-6 py-4 font-medium text-gray-900">
                       {item.productName}
@@ -162,10 +213,14 @@ const Favouriteproducts = () => {
                     </td>
                     <td class="px-6 py-4 font-medium text-blue-900 flex flex-row">
                       <img
-                        className="w-6 h-6 object-cover mr-3"
+                        className="w-6 h-6 object-cover mr-3 cursor-pointer"
                         src={DeleteIconSVG}
                         whileHover={{ scale: 1.15 }}
                         alt="delete icon"
+                        onClick={() => {
+                          setIsDeleteModalOpen(true);
+                          setProdId(item._id)
+                        }}
                       />
                       <Link to={"/editProduct/" + item._id}>
                         <img
@@ -176,9 +231,9 @@ const Favouriteproducts = () => {
                         />
                       </Link>
                       <div onClick={(event) => handleClick(item._id, event)}>
-                        <Link to={""} >
-                          {item.isFav ? (
-                             <img className="w-6 h-6 object-contain" src={StarredSVG} />
+                        <Link to={"/"} >
+                          {favproductData.some(favItem => favItem.id === item._id) ? (
+                            <img className="w-6 h-6 object-contain" src={StarredSVG} />
                           ) : (
                             <img
                               className="w-6 h-6 object-cover"
@@ -197,6 +252,12 @@ const Favouriteproducts = () => {
           </div>
         </div>
       </div>
+
+      <DeletePopup
+        isOpen={isDeleteModalOpen}
+        onCancel={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDelete}
+      />
 
     </div>
   )

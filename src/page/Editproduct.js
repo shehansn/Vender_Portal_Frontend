@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { toast } from 'react-hot-toast';
 import { useSelector } from "react-redux";
 import { useParams } from "react-router-dom";
 import { ArrowSVG } from "../assets/index";
-import { ImagetoBase64 } from '../utility/ImagetoBase64';
 
 const Editproduct = () => {
     const SERVER_URL = process.env.SERVER_DOMAIN || "http://localhost:8080";
@@ -11,6 +10,9 @@ const Editproduct = () => {
     const routeParams = useParams();
     const productId = routeParams.productId;
     const productData = useSelector((state) => state.product.productList);
+    const fileInputRef = useRef(null);
+    const [images, setImages] = useState([]);
+    const [imagePreviews, setImagePreviews] = useState([]);
 
     const [data, setData] = useState({
         _id: "",
@@ -18,8 +20,7 @@ const Editproduct = () => {
         productName: "",
         quantity: "",
         productDescription: "",
-        image: "",
-        isFav: false
+        images: [],
     })
 
     useEffect(() => {
@@ -55,37 +56,45 @@ const Editproduct = () => {
 
     }
 
-    const uploadImage = async (e) => {
-        const data = await ImagetoBase64(e.target.files[0])
-
-        setData((preve) => {
-            return {
-                ...preve,
-                image: data
-            }
-        })
-    }
-
     const handleSubmit = async (e) => {
         e.preventDefault()
         console.log(data)
 
-        const { sku, productName, quantity, productDescription, image, isFav } = data
+        const { sku, productName, quantity, productDescription } = data
 
         if (sku && productName && quantity && productDescription) {
 
-            const fetchData = await fetch(`${SERVER_URL}/editProduct/${productId}`, {
-                method: "PUT",
-                headers: {
-                    "content-type": "application/json"
-                },
-                body: JSON.stringify(data)
-            })
+            const formData = new FormData();
+            console.log('FormData before append:', formData);
+            formData.append('sku', sku);
+            formData.append('productName', productName);
+            formData.append('quantity', quantity);
+            formData.append('productDescription', productDescription);
 
-            const fetchRes = await fetchData.json()
+            if (imagePreviews == undefined) {
+                data.images.forEach(image => {
+                    formData.append('images', image);
+                });
+            } else {
+                imagePreviews.forEach(image => {
+                    formData.append('images', image);
+                });
+            }
 
-            console.log(fetchRes)
-            toast(fetchRes.message)
+
+            console.log('FormData after append:', formData);
+
+            try {
+                const response = await fetch(`${SERVER_URL}/editProduct/${productId}`, {
+                    method: "PUT",
+                    body: formData
+                });
+
+                console.log(response);
+                toast(response.data.message)
+            } catch (error) {
+                console.error(error);
+            }
 
             setData(() => {
                 return {
@@ -93,15 +102,34 @@ const Editproduct = () => {
                     productName: "",
                     quantity: "",
                     productDescription: "",
-                    image: "",
-                    isFav: false
                 }
             })
+            setImages([])
+            setImagePreviews([])
         }
         else {
             toast("Enter required Fields")
         }
     }
+
+    const handleAddImagesClick = () => {
+        fileInputRef.current.click();
+    };
+
+    const handleImageChange = (e) => {
+        const files = Array.from(e.target.files);
+        setImages(files);
+
+        const previews = files.map(file => URL.createObjectURL(file));
+        setImagePreviews(previews);
+
+        setData(prevData => ({
+            ...prevData,
+            images: files
+        }));
+    };
+
+
     return (
         <div className="p-4">
             <div className="w-full flex flex-col overflow-x-hidden h-auto flex flex-col items-start px-6 md:px-24 2xl:px-96 gap-12 pb-24">
@@ -196,8 +224,28 @@ const Editproduct = () => {
                                 </span>
                             </label>
                             <div class="relative text-gray-600 w-1/3 flex flex-row">
+                                {imagePreviews.undefined ? (<>
+                                    <div className='flex flex-row'>
+                                        {imagePreviews.map((preview, index) => (
+                                            <img key={index} src={preview} alt={`Preview ${index}`} style={{ maxWidth: '100px', maxHeight: '100px', margin: '5px', display: 'flex' }} />
+                                        )
+                                        )
+                                        }</div>
+                                </>
+                                ) : (
+                                    <>{data.images.length > 0 && data.images.map((image, index) => (
+                                        <img
+                                            key={index}
+                                            src={`${SERVER_URL}/${data.images[index].substring(7).replace(/\\/g, '/')}`}
+                                            alt={`Product image ${index + 1}`}
+                                            className="h-16 ml-2"
+                                        />
+                                    ))}</>
+                                )
 
-                                {data.image ? (
+                                }
+
+                                {/* {data.images.length>0 && data.images.map ? (
                                     <img src={data.image} className="h-16" />
                                 ) : (
                                     <><input
@@ -207,19 +255,31 @@ const Editproduct = () => {
                                         class=" w-full h-12 px-5 pr-10 rounded-xl text-sm focus:outline-none "
                                         onChange={uploadImage}
                                     /></>
-                                )}
-                                <p className="text-blue-700 text-lg ml-2">Edit Images</p>
+                                )} */}
+                                <p className="text-blue-700 text-lg ml-2 cursor-pointer" onClick={handleAddImagesClick}>Edit Images</p>
+                                <input
+                                    id="imageUpload"
+                                    type="file"
+                                    name="images"
+                                    placeholder="Select Images"
+                                    class=" w-full h-12 px-5 pr-10 rounded-xl text-sm focus:outline-none "
+                                    multiple
+                                    onChange={handleImageChange}
+                                    style={{ display: 'none' }}
+                                    ref={fileInputRef}
+                                />
+
                             </div>
                         </div>
 
-                        <div className="flex justify-end"> 
+                        <div className="flex justify-end">
                             <button
-                            class="text-white mt-5 -mr-8 w-32 bg-blue-700 hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-300 font-medium rounded-md text-sm px-5 py-2.5 text-center mr-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
-                        >
-                            Edit Product
-                        </button></div>
+                                class="text-white mt-5 -mr-8 w-32 bg-blue-700 hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-300 font-medium rounded-md text-sm px-5 py-2.5 text-center mr-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+                            >
+                                Edit Product
+                            </button></div>
 
-                       
+
                     </form>
                 </div>
             </div>

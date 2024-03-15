@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { toast } from 'react-hot-toast';
-import { ImagetoBase64 } from '../utility/ImagetoBase64';
 
 import { ArrowSVG } from "../assets/index";
 
@@ -12,9 +11,11 @@ const Newproduct = () => {
     productName: "",
     quantity: "",
     productDescription: "",
-    image: "",
-    isFav:false
+    images:[]
   })
+  const [images, setImages] = useState([]);
+  const [imagePreviews, setImagePreviews] = useState([]);
+  const fileInputRef = useRef(null);
 
   const handleOnChange = (e) => {
     const { name, value } = e.target
@@ -29,53 +30,75 @@ const Newproduct = () => {
 
   }
 
-  const uploadImage = async (e) => {
-    const data = await ImagetoBase64(e.target.files[0])
-    setData((preve) => {
-      return {
-        ...preve,
-        image: data
-      }
-    })
-  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     console.log(data)
 
-    const { sku, productName, quantity, productDescription,image,isFav } = data
+    const { sku, productName, quantity, productDescription } = data
 
-    if(sku && productName && quantity && productDescription){
-      const fetchData = await fetch(`${SERVER_URL}/addNewProduct`,{
-        method : "POST",
-        headers : {
-          "content-type" : "application/json"
-        },
-        body : JSON.stringify(data)
-      })
+    if (sku && productName && quantity && productDescription) {
 
-      const fetchRes =  await fetchData.json()
+      const formData = new FormData();
+      console.log('FormData before append:', formData);
+      formData.append('sku', sku);
+      formData.append('productName', productName);
+      formData.append('quantity', quantity);
+      formData.append('productDescription', productDescription);
+  
+      images.forEach(image => {
+        formData.append('images', image);
+      });
+  
+      console.log('FormData after append:', formData);
+    
+      try {
+        const response = await fetch(`${SERVER_URL}/upload`, {
+          method: "POST",
+          body:formData
+        });
 
-      console.log(fetchRes)
-      toast(fetchRes.message)
+        console.log(response);
+        toast(response.data.message)
+      } catch (error) {
+        console.error(error);
+      }
 
-      setData(()=>{
-        return{
+      setData(() => {
+        return {
           sku: "",
           productName: "",
           quantity: "",
           productDescription: "",
-          image: "",
-          isFav:false
         }
       })
+      setImages([])
+      setImagePreviews([])
     }
-    else{
+    else {
       toast("Enter required Fields")
     }
 
 
   }
+
+  const handleImageChange = (e) => {
+    const files = Array.from(e.target.files);
+    setImages(files);
+
+    const previews = files.map(file => URL.createObjectURL(file));
+    setImagePreviews(previews);
+
+    setData(prevData => ({
+      ...prevData,
+      images: files
+    }));
+  };
+
+  const handleAddImagesClick = () => {
+    fileInputRef.current.click();
+  };
+  
   return (
     <div className="p-4 ">
 
@@ -102,7 +125,7 @@ const Newproduct = () => {
                   name="sku"
                   placeholder="Enter SKU"
                   class="bg-gray-100 w-96 h-12 px-5 pr-10 rounded-xl text-sm focus:outline-none"
-                  onChange={ handleOnChange}
+                  onChange={handleOnChange}
                   value={data.sku}
                 />
               </div>
@@ -119,7 +142,7 @@ const Newproduct = () => {
                     name="productName"
                     placeholder="Enter Product Name"
                     class="bg-gray-100 w-96 h-12 px-5 pr-10 rounded-xl text-sm focus:outline-none"
-                    onChange={ handleOnChange}
+                    onChange={handleOnChange}
                     value={data.productName}
                   />
                 </div>
@@ -170,19 +193,28 @@ const Newproduct = () => {
                   JPEG, PNG, SVG or GIF (Maximum file size 50MB)
                 </span>
               </label>
-              <div class="relative text-gray-600 w-1/3">
+              <div class="relative text-gray-600 w-1/3 flex flex-row">
                 <input
+                  id="imageUpload"
                   type="file"
                   name="images"
                   placeholder="Select Images"
                   class=" w-full h-12 px-5 pr-10 rounded-xl text-sm focus:outline-none "
-                  onChange={uploadImage}
+                  multiple
+                  onChange={handleImageChange}
+                  style={{ display: 'none' }}
+                  ref={fileInputRef}
                 />
-                {data.image ? (
-                  <img src={data.image} className="h-20" />
-                ) : (
-                  <></>
-                )}
+
+                {imagePreviews ? (<div className='flex flex-row'>
+                  {imagePreviews.map((preview, index) => (
+                    <img key={index} src={preview} alt={`Preview ${index}`} style={{ maxWidth: '100px', maxHeight: '100px', margin: '5px', display: 'flex' }} />
+                  ))
+                  }</div>) : (<></>)
+
+                }
+
+                <p htmlFor="imageUpload" className="text-blue-700 text-lg ml-2 cursor-pointer" onClick={handleAddImagesClick}>Add Images</p>
 
               </div>
             </div>
