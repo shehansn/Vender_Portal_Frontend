@@ -13,6 +13,7 @@ import Editproduct from "./page/Editproduct";
 import Favouriteproducts from "./page/Favouriteproducts";
 import Home from "./page/Home";
 import Newproduct from "./page/Newproduct";
+import SearchResult from "./page/SearchResult";
 import { store } from "./redux/index";
 
 const router = createBrowserRouter(
@@ -22,6 +23,7 @@ const router = createBrowserRouter(
       <Route path="addProduct" element={<Newproduct />} />
       <Route path="editProduct/:productId" element={<Editproduct />} />
       <Route path="favProducts" element={<Favouriteproducts />} />
+      <Route path="searchProduct/:productName" element={<SearchResult />} />
     </Route>
   )
 );
